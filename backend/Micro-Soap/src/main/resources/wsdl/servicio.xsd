@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+	targetNamespace="http://fisiomarca.com/soap"
+	xmlns:tns="http://fisiomarca.com/soap"
+	elementFormDefault="qualified">
+
+	<!-- Contrato del servicio (tipo de dato) -->
+	<xsd:complexType name="servicio">
+		<xsd:sequence>
+			<xsd:element name="id" type="xsd:int"/>
+			<xsd:element name="nombre" type="xsd:string"/>
+			<xsd:element name="descripcion" type="xsd:string" minOccurs="0"/>
+			<xsd:element name="precio" type="xsd:double"/>
+			<xsd:element name="duracionMinutos" type="xsd:int"/>
+			<xsd:element name="imagenUrl" type="xsd:string" minOccurs="0"/>
+			<xsd:element name="activo" type="xsd:boolean"/>
+			<xsd:element name="categoriaId" type="xsd:int"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<!-- Listar todos los servicios -->
+	<xsd:element name="getServiciosRequest">
+		<xsd:complexType/>
+	</xsd:element>
+	<xsd:element name="getServiciosResponse">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="lista" type="tns:servicio" minOccurs="0" maxOccurs="unbounded"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+	<!-- Buscar un servicio por id -->
+	<xsd:element name="getServicioRequest">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="id" type="xsd:int"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="getServicioResponse">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="bean" type="tns:servicio" minOccurs="0"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+	<!-- Registrar un servicio -->
+	<xsd:element name="postServicioRequest">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="bean" type="tns:servicio"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="postServicioResponse">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="estado" type="xsd:int"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+</xsd:schema>

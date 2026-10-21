@@ -1,0 +1,205 @@
+# ════════════════════════════════════════════════════════════════════
+#  FisioMarca · Ecosistema completo en Docker
+# ════════════════════════════════════════════════════════════════════
+#  Primera vez (compila todo, ~5-10 min):   docker compose up --build -d
+#  Siguientes veces (segundos):             docker compose up -d
+#  Reiniciar la BD con datos demo frescos:  docker compose down -v
+#
+#  Frontend  http://localhost:3000     Gateway  http://localhost:8080
+#  Eureka    http://localhost:8761     MySQL    localhost:3307 (root / mysql)
+#
+#  Orden de arranque (depends_on + healthcheck):
+#    mysql ─┬─> auth · catalogo · soap · reservas · carrito ─┐
+#    eureka ┴─> gateway ──────────────────────────────────────┴─> frontend
+#  Los micros no publican puertos: todo entra por el Gateway, como en local.
+# ════════════════════════════════════════════════════════════════════
+
+name: fisiomarca
+
+# ─── Configuración común de los microservicios Spring Boot ──────────
+x-java-env: &java-env
+  TZ: America/Lima
+  EUREKA_URL: http://eureka-server:8761/eureka
+  JWT_SECRET: ${JWT_SECRET:-/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+  JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+  SPRING_JPA_SHOW_SQL: "false"
+  # Descubrimiento rápido: por defecto Eureka tarda ~1 min en propagar
+  EUREKA_CLIENT_REGISTRYFETCHINTERVALSECONDS: "5"
+  EUREKA_CLIENT_INITIALINSTANCEINFOREPLICATIONINTERVALSECONDS: "5"
+  EUREKA_INSTANCE_LEASERENEWALINTERVALINSECONDS: "10"
+  SPRING_CLOUD_LOADBALANCER_CACHE_TTL: 5s
+
+x-java: &java
+  restart: on-failure
+  mem_limit: 512m
+
+x-espera-bd-y-eureka: &espera-bd-y-eureka
+  mysql:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+
+services:
+  # ─── Base de datos ────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.4
+    restart: on-failure
+    # -05:00: CURDATE() del script demo es el día de Perú (como el MySQL local)
+    command: ["--default-time-zone=-05:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      TZ: America/Lima
+    ports:
+      - "3307:3306" # 3307 para no chocar con el MySQL80 instalado en Windows
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Solo la primera vez (volumen vacío): 01-fisiomarca.sql y luego 02-estados-pagos.sql
+      - ./SQL:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Por TCP: durante la carga inicial MySQL corre sin red, así que esto
+      # solo pasa cuando los scripts de SQL/ ya terminaron
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ─── Service discovery ────────────────────────────────────────────
+  eureka-server:
+    <<: *java
+    build: ./backend/Servidor-Eureka
+    image: fisiomarca/eureka-server
+    environment:
+      TZ: America/Lima
+      EUREKA_SERVER_ENABLESELFPRESERVATION: "false"
+      EUREKA_SERVER_RESPONSECACHEUPDATEINTERVALMS: "3000"
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8761/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  # ─── Punto de entrada único (valida el JWT) ───────────────────────
+  gateway-service:
+    <<: *java
+    build: ./backend/Gateway
+    image: fisiomarca/gateway-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: gateway-service
+      FRONTEND_URL_NEXT: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    healthcheck: &salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8080 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  # ─── Microservicios de dominio ────────────────────────────────────
+  auth-service:
+    <<: *java
+    build: ./backend/AUTH-SERVICE
+    image: fisiomarca/auth-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: auth-service
+      DB_USUARIOS_URL: "jdbc:mysql://mysql:3306/fisiomarca_usuarios?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USUARIOS_USER: root
+      DB_USUARIOS_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+    depends_on: *espera-bd-y-eureka
+    healthcheck:
+      <<: *salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8099 || exit 1"]
+
+  catalogo-service:
+    <<: *java
+    build: ./backend/Micro-Catalogo
+    image: fisiomarca/catalogo-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: catalogo-service
+      DB_CATALOGO_URL: "jdbc:mysql://mysql:3306/fisiomarca_catalogo?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_CATALOGO_USER: root
+      DB_CATALOGO_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+    depends_on: *espera-bd-y-eureka
+    healthcheck:
+      <<: *salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8090 || exit 1"]
+
+  reservas-service:
+    <<: *java
+    build: ./backend/Micro-Reservas
+    image: fisiomarca/reservas-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: reservas-service
+      DB_RESERVAS_URL: "jdbc:mysql://mysql:3306/fisiomarca_reservas?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_RESERVAS_USER: root
+      DB_RESERVAS_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+    depends_on: *espera-bd-y-eureka
+    healthcheck:
+      <<: *salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8092 || exit 1"]
+
+  carrito-service:
+    <<: *java
+    build: ./backend/Micro-Carrito
+    image: fisiomarca/carrito-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: carrito-service
+      DB_CARRITO_URL: "jdbc:mysql://mysql:3306/fisiomarca_carrito?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_CARRITO_USER: root
+      DB_CARRITO_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+    depends_on: *espera-bd-y-eureka
+    healthcheck:
+      <<: *salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8093 || exit 1"]
+
+  # ─── Servicio SOAP (lee el catálogo con JdbcTemplate) ─────────────
+  soap-service:
+    <<: *java
+    build: ./backend/Micro-Soap
+    image: fisiomarca/soap-service
+    environment:
+      <<: *java-env
+      EUREKA_INSTANCE_HOSTNAME: soap-service
+      DB_SOAP_URL: "jdbc:mysql://mysql:3306/fisiomarca_catalogo?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_SOAP_USER: root
+      DB_SOAP_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+    depends_on: *espera-bd-y-eureka
+    healthcheck:
+      <<: *salud-java
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8098 || exit 1"]
+
+  # ─── Frontend Next.js ─────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    image: fisiomarca/frontend
+    restart: on-failure
+    mem_limit: 512m
+    environment:
+      HOSTNAME: 0.0.0.0
+      # El navegador llama a /gateway/* del propio front y este lo reenvía
+      # al Gateway por la red interna (sin CORS ni localhost:8080 fijo)
+      GATEWAY_INTERNAL_URL: http://gateway-service:8080
+      JWT_SECRET: ${JWT_SECRET:-/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+      # Opcional: sin clave el chatbot responde con su modo local (botones + palabras clave)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+    ports:
+      - "3000:3000"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+
+volumes:
+  mysql-data:

@@ -1,0 +1,23 @@
+# ─── Generados (se recrean con pnpm install / mvn package / docker) ──
+node_modules/
+.next/
+out/
+target/
+*.tsbuildinfo
+
+# ─── IDE ─────────────────────────────────────────────────────────────
+.metadata/
+.idea/
+*.iml
+.vscode/
+
+# ─── Logs y temporales ───────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# ─── Secretos ────────────────────────────────────────────────────────
+.env
+.env.local

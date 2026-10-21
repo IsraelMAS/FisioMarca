@@ -1,0 +1,14 @@
+# Solo pom.xml y src/ entran a la imagen
+target
+.mvn
+mvnw
+mvnw.cmd
+.settings
+.classpath
+.project
+.factorypath
+.idea
+*.iml
+*.log
+Dockerfile
+.dockerignore

@@ -1,0 +1,19 @@
+server:
+  port: 8098
+
+spring:
+  application:
+    name: MICRO-SOAP
+  # El servicio SOAP lee la tabla "servicios" del catalogo FisioMarca via JdbcTemplate.
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_SOAP_URL:jdbc:mysql://localhost:3306/fisiomarca_catalogo?serverTimezone=UTC}
+    username: ${DB_SOAP_USER:root}
+    password: ${DB_SOAP_PASSWORD:mysql}
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}

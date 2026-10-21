@@ -1,0 +1,16 @@
+# Se generan dentro de la imagen
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+
+# Secretos locales: nunca dentro de la imagen (se pasan en docker-compose)
+.env*
+
+# Ruido
+Dockerfile
+.dockerignore
+npm-debug.log*
+.pnpm-debug.log*
+.DS_Store

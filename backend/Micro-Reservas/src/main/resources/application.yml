@@ -1,0 +1,30 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: MICRO-RESERVAS
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_RESERVAS_URL:jdbc:mysql://localhost:3306/fisiomarca_reservas?serverTimezone=UTC}
+    username: ${DB_RESERVAS_USER:root}
+    password: ${DB_RESERVAS_PASSWORD:mysql}
+  jpa:
+    database: MYSQL
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  messages:
+    basename: validaciones
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+
+# Secreto compartido para validar el JWT (HS256) que emite AUTH-SERVICE.
+jwt:
+  secret: ${JWT_SECRET:/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+  expiration: ${JWT_EXPIRATION:3600000}

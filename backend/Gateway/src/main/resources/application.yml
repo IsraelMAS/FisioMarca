@@ -1,0 +1,65 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: GATEWAY
+  cloud:
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - ${FRONTEND_URL:http://localhost:4200}
+                  - ${FRONTEND_URL_VITE:http://localhost:5173}
+                  - ${FRONTEND_URL_NEXT:http://localhost:3000}
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - '*'
+                allowCredentials: true
+          routes:
+            # AUTENTICACION Y USUARIOS (AUTH-SERVICE)
+            - id: AUTH-SERVICE
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/auth/**,/usuarios/**
+            # MICROS DE DOMINIO (REST)
+            - id: MICRO-CATALOGO
+              uri: lb://MICRO-CATALOGO
+              predicates:
+                - Path=/catalogo/**
+            - id: MICRO-RESERVAS
+              uri: lb://MICRO-RESERVAS
+              predicates:
+                - Path=/reservas/**
+            - id: MICRO-CARRITO
+              uri: lb://MICRO-CARRITO
+              predicates:
+                - Path=/carrito/**
+            # SERVICIO SOAP (Spring Web Services expuesto en /ws/*)
+            - id: MICRO-SOAP
+              uri: lb://MICRO-SOAP
+              predicates:
+                - Path=/ws/**
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    fetch-registry: true
+    register-with-eureka: true
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+
+# El mismo secreto/expiracion que AUTH-SERVICE para poder validar el JWT en el filtro global.
+jwt:
+  secret: ${JWT_SECRET:/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+  expiration: ${JWT_EXPIRATION:3600000}
