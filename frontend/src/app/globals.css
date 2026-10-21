@@ -197,6 +197,18 @@ body {
   .splash-logo, .splash-logo::before, .splash-logo::after, .splash-barra::after { animation: none; }
 }
 
+/* ─── Inicio: badge flotante del hero (CSS puro, solo transform) ─── */
+.flotar {
+  animation: flotar 4s ease-in-out infinite;
+}
+@keyframes flotar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flotar { animation: none; }
+}
+
 /* ─── Páginas de estado (404 / error) ───────────────────────────── */
 .estado-numero {
   background: linear-gradient(115deg, #5eead4 0%, #ffffff 35%, #fde68a 55%, #5eead4 80%);
